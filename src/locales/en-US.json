@@ -170,6 +170,7 @@
     "move": "Move",
     "minimizeOnStart": "Minimize on Start",
     "minimizeToTray": "Minimize to Tray",
+    "closeToTray": "Minimize to Tray on Close",
     "viewerType": "Viewer Type",
     "originalViewer": "Original Viewer"
   },

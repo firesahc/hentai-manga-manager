@@ -170,6 +170,7 @@
     "move": "移动",
     "minimizeOnStart": "启动后最小化",
     "minimizeToTray": "最小化到托盘",
+    "closeToTray": "关闭时最小化到托盘",
     "viewerType": "阅读器类型",
     "originalViewer": "原版阅读器"
   },

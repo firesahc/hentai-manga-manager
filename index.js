@@ -120,7 +120,7 @@ const createTray = () => {
     {
       label: 'exit',
       click: () => {
-        mainWindow.close()
+        mainWindow.destroy()
       }
     }
   ])
@@ -168,6 +168,14 @@ const createWindow = () => {
       }
     } else {
       win.show()
+    }
+  })
+  win.on('close', (event) => {
+    if (setting.closeToTray) {
+      event.preventDefault()
+      createTray()
+      win.hide()
+      win.setSkipTaskbar(true)
     }
   })
   win.on('minimize', (event) => {
@@ -867,7 +875,7 @@ ipcMain.handle('save-setting', async (event, receiveSetting) => {
     })
   }
   setting = receiveSetting
-  if (tray && !setting.minimizeToTray) {
+  if (tray && !setting.minimizeToTray && !setting.closeToTray) {
     tray.destroy()
     tray = null
   }

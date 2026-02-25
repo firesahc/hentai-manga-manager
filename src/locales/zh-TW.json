@@ -170,6 +170,7 @@
     "move": "移動",
     "minimizeOnStart": "啟動後最小化",
     "minimizeToTray": "最小化到托盤",
+    "closeToTray": "關閉時最小化到托盤",
     "viewerType": "閱讀器類型",
     "originalViewer": "原版閱讀器"
   },
