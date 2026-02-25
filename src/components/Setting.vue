@@ -577,7 +577,7 @@ const loadTranslationFromEhTagTranslation = async () => {
       const namespace = namespaceObj.namespace
       resultObject[namespace] = {}
       if (namespaceObj.frontMatters) {
-        resultObject[namespace].name = namespaceObj.frontMatters.name
+        resultObject[namespace]._name = namespaceObj.frontMatters.name
       }
       _.forIn(namespaceObj.data, (value, key) => {
         resultObject[namespace][key] = _.pick(value, ['name', 'intro'])
@@ -745,7 +745,7 @@ const formTagAdd = ref({
 const tagListForCollect = computed(() => {
   if (setting.value.showTranslation) {
     return tagListRaw.value.map(({letter, cat, tag, id}) => {
-      const labelHeader = resolvedTranslation.value[cat]?.name || cat
+      const labelHeader = resolvedTranslation.value[cat]?._name || cat
       const labelTail = resolvedTranslation.value[cat]?.[tag]?.name || tag
       return {
         label: `${labelHeader}:${labelTail} || ${letter}:"${tag}"$`,

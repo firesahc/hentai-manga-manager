@@ -108,7 +108,7 @@
               <el-descriptions-item :label="$t('m.category')+':'">
                 <el-tag type="info" class="book-tag" @click="$emit('searchFromTag', `cat:${bookDetail.category}`)">{{bookDetail.category}}</el-tag>
               </el-descriptions-item>
-              <el-descriptions-item v-for="(tagArr, key) in bookDetail.tags" :label="resolvedTranslation[key]?.name || key + ':'" :key="key">
+              <el-descriptions-item v-for="(tagArr, key) in bookDetail.tags" :label="resolvedTranslation[key]?._name || key + ':'" :key="key">
                 <el-popover
                   effect="dark"
                   trigger="hover"

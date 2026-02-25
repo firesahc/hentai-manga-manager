@@ -77,7 +77,7 @@
                 <el-descriptions-item :label="$t('m.category')+':'">
                   <el-tag type="info" class="book-tag" @click="$emit('searchFromTag', book.category)">{{book.category}}</el-tag>
                 </el-descriptions-item>
-                <el-descriptions-item v-for="(tagArr, key) in book.tags" :label="resolvedTranslation[key]?.name || key + ':'" :key="key">
+                <el-descriptions-item v-for="(tagArr, key) in book.tags" :label="resolvedTranslation[key]?._name || key + ':'" :key="key">
                   <el-tag type="info" class="book-tag" v-for="tag in tagArr" :key="tag" @click="$emit('searchFromTag', tag, key)"
                   >{{resolvedTranslation[key]?.[tag]?.name || tag }}</el-tag>
                 </el-descriptions-item>
