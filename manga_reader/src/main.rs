@@ -1,7 +1,6 @@
 #![windows_subsystem = "windows"]
 
 use eframe::egui;
-use glob::glob;
 use std::env;
 use std::fs;
 use std::io;
@@ -128,7 +127,12 @@ impl MangaReaderApp {
         let pattern_gif = format!("{}/**/*.gif", glob::Pattern::escape(folder_path));
 
         let mut collect_paths = |pattern: &str| {
-            if let Ok(glob_paths) = glob(pattern) {
+            let options = glob::MatchOptions {
+                case_sensitive: false,
+                require_literal_separator: false,
+                require_literal_leading_dot: false,
+            };
+            if let Ok(glob_paths) = glob::glob_with(pattern, options) {
                 paths.extend(glob_paths.filter_map(Result::ok));
             }
         };
@@ -674,6 +678,13 @@ impl eframe::App for MangaReaderApp {
                                         ui.add_space(4.0);
                                     }
                                 });
+
+                                // 提前加载下一张图片
+                                if self.current_page + 1 < self.images.len() {
+                                    let next_image_data = &self.images[self.current_page + 1];
+                                    let next_uri = format!("file://{}", next_image_data.path.to_string_lossy());
+                                    let _ = ui.ctx().try_load_image(&next_uri, egui::load::SizeHint::default());
+                                }
                             }
                         });
                 }
