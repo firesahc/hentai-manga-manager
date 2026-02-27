@@ -7,6 +7,7 @@ use std::io;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const ARCHIVE_IN_MEMORY_LIMIT_BYTES: usize = 1024 * 1024 * 1024;
 const ARCHIVE_ESTIMATED_DECODED_LIMIT_BYTES: usize = 8192 * 1024 * 1024;
@@ -97,10 +98,16 @@ struct MangaReaderApp {
     scroll_accumulator: f32,
     load_receiver: Option<std::sync::mpsc::Receiver<LoadResultData>>,
     pending_load_path: Option<PathBuf>,
+    scroll_area_id: String,
 }
 
 impl Default for MangaReaderApp {
     fn default() -> Self {
+        let initial_id = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+            .to_string();
         Self {
             images: Vec::new(),
             folder_path: None,
@@ -114,6 +121,7 @@ impl Default for MangaReaderApp {
             scroll_accumulator: 0.0,
             load_receiver: None,
             pending_load_path: None,
+            scroll_area_id: initial_id,
         }
     }
 }
@@ -486,6 +494,12 @@ impl MangaReaderApp {
         self.current_page = 0;
         self._temp_dir = None;
         self.load_receiver = None;
+
+        self.scroll_area_id = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+            .to_string();
     }
 
     fn estimated_decoded_bytes_from_image_bytes(bytes: &[u8]) -> usize {
@@ -847,6 +861,7 @@ impl eframe::App for MangaReaderApp {
 
                 if self.view_mode == ViewMode::Scroll {
                     egui::ScrollArea::vertical()
+                        .id_salt(&self.scroll_area_id)
                         .auto_shrink([false; 2])
                         .stick_to_bottom(false)
                         .wheel_scroll_multiplier(egui::vec2(3.0, 3.0))
@@ -920,6 +935,7 @@ impl eframe::App for MangaReaderApp {
                 } else {
                     let available_height = ui.available_height();
                     egui::ScrollArea::vertical()
+                        .id_salt(&self.scroll_area_id)
                         .auto_shrink([false; 2])
                         .stick_to_bottom(false)
                         .wheel_scroll_multiplier(egui::vec2(0.0, 0.0))
