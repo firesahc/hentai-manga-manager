@@ -622,13 +622,19 @@ impl eframe::App for MangaReaderApp {
 
                                     let img_response = ui.add(
                                         egui::Image::new(&uri)
-                                            .fit_to_exact_size(egui::vec2(final_w, final_h))
-                                            .sense(egui::Sense::click()),
+                                            .fit_to_exact_size(egui::vec2(final_w, final_h)),
                                     );
 
-                                    if img_response.clicked() {
-                                        if let Some(pos) = img_response.interact_pointer_pos() {
-                                            if pos.x > img_response.rect.center().x {
+                                    let clip_rect = ui.clip_rect();
+                                    let click_response = ui.interact(
+                                        clip_rect,
+                                        ui.id().with("single_page_click"),
+                                        egui::Sense::click(),
+                                    );
+
+                                    if click_response.clicked() {
+                                        if let Some(pos) = click_response.interact_pointer_pos() {
+                                            if pos.x > clip_rect.center().x {
                                                 if self.current_page + 1 < self.images.len() {
                                                     self.current_page += 1;
                                                 }
