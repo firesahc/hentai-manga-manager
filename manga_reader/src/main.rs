@@ -779,7 +779,10 @@ impl eframe::App for MangaReaderApp {
             }
         });
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        let frame = egui::Frame::central_panel(&ctx.style())
+            .fill(egui::Color32::from_rgb(240, 240, 240));
+
+        egui::CentralPanel::default().frame(frame).show(ctx, |ui| {
             if self.images.is_empty() {
                 ui.heading("Manga Reader");
                 ui.add_space(20.0);
