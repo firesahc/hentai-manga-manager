@@ -862,6 +862,8 @@ impl eframe::App for MangaReaderApp {
                 ui.separator();
 
                 if self.view_mode == ViewMode::Scroll {
+                    let mut visible_range: Option<(usize, usize)> = None;
+
                     egui::ScrollArea::vertical()
                         .id_salt(&self.scroll_area_id)
                         .auto_shrink([false; 2])
@@ -906,6 +908,14 @@ impl eframe::App for MangaReaderApp {
                                         ui.allocate_exact_size(image_size, egui::Sense::hover());
 
                                     if ui.is_rect_visible(rect) {
+                                        match &mut visible_range {
+                                            Some((min_idx, max_idx)) => {
+                                                *min_idx = (*min_idx).min(index);
+                                                *max_idx = (*max_idx).max(index);
+                                            }
+                                            None => visible_range = Some((index, index)),
+                                        }
+
                                         let image_widget = Self::archive_image_widget(image_data);
                                         image_widget.paint_at(ui, rect);
 
@@ -932,6 +942,27 @@ impl eframe::App for MangaReaderApp {
                                 });
                             }
                         });
+
+                    if let Some((min_idx, max_idx)) = visible_range {
+                        let keep_min = min_idx.saturating_sub(3);
+                        let keep_max = max_idx.saturating_add(3);
+
+                        for i in keep_min..=keep_max {
+                            if i < self.images.len() && (i < min_idx || i > max_idx) {
+                                let pre_image_data = &self.images[i];
+                                let pre_image = Self::archive_image_widget(pre_image_data);
+                                let _ = pre_image.load_for_size(ui.ctx(), ui.available_size());
+                            }
+                        }
+
+                        for i in 0..self.images.len() {
+                            if i < keep_min || i > keep_max {
+                                if let Some(uri) = self.get_image_uri(i) {
+                                    ctx.forget_image(&uri);
+                                }
+                            }
+                        }
+                    }
                 } else {
                     let available_height = ui.available_height();
                     egui::ScrollArea::vertical()
@@ -1024,10 +1055,14 @@ impl eframe::App for MangaReaderApp {
                                     }
                                 });
 
-                                for offset in 1..=3 {
-                                    if self.current_page + offset < self.images.len() {
-                                        let pre_image_data =
-                                            &self.images[self.current_page + offset];
+                                let pre_min = self.current_page.saturating_sub(3);
+                                let pre_max = self
+                                    .current_page
+                                    .saturating_add(3)
+                                    .min(self.images.len().saturating_sub(1));
+                                for i in pre_min..=pre_max {
+                                    if i != self.current_page {
+                                        let pre_image_data = &self.images[i];
                                         let pre_image = Self::archive_image_widget(pre_image_data);
                                         let _ =
                                             pre_image.load_for_size(ui.ctx(), ui.available_size());
@@ -1040,8 +1075,14 @@ impl eframe::App for MangaReaderApp {
         });
 
         if self.view_mode == ViewMode::SinglePage && target_page != self.current_page {
-            if let Some(uri) = self.get_image_uri(self.current_page) {
-                ctx.forget_image(&uri);
+            let keep_min = target_page.saturating_sub(3);
+            let keep_max = target_page.saturating_add(3);
+            for i in 0..self.images.len() {
+                if i < keep_min || i > keep_max {
+                    if let Some(uri) = self.get_image_uri(i) {
+                        ctx.forget_image(&uri);
+                    }
+                }
             }
             self.current_page = target_page;
             requests_repaint = true;
