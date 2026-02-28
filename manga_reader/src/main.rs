@@ -847,24 +847,7 @@ impl eframe::App for MangaReaderApp {
                     }
                     ui.separator();
 
-                    if self.view_mode == ViewMode::SinglePage && !self.images.is_empty() {
-                        ui.label(format!(
-                            "Page {} / {}",
-                            self.current_page + 1,
-                            self.images.len()
-                        ));
-                        if ui.button("Prev").clicked() && target_page > 0 {
-                            target_page -= 1;
-                            requests_repaint = true;
-                        }
-                        if ui.button("Next").clicked() && target_page + 1 < self.images.len() {
-                            target_page += 1;
-                            requests_repaint = true;
-                        }
-                        ui.separator();
-                    } else {
-                        ui.label(format!("{} images", self.images.len()));
-                    }
+                    ui.label(format!("{} images", self.images.len()));
 
                     if ui.button("Close").clicked() {
                         self.clear_loaded_images(Some(ctx));
