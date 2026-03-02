@@ -100,6 +100,7 @@ struct MangaReaderApp {
     pending_load_path: Option<PathBuf>,
     scroll_area_id: String,
     scroll_to_page: Option<usize>,
+    dark_mode: bool,
 }
 
 impl Default for MangaReaderApp {
@@ -124,6 +125,7 @@ impl Default for MangaReaderApp {
             pending_load_path: None,
             scroll_area_id: initial_id,
             scroll_to_page: None,
+            dark_mode: false,
         }
     }
 }
@@ -691,9 +693,19 @@ impl MangaReaderApp {
 impl eframe::App for MangaReaderApp {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(storage, "view_mode", &self.view_mode);
+        eframe::set_value(storage, "dark_mode", &self.dark_mode);
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let is_dark = ctx.style().visuals.dark_mode;
+        if self.dark_mode != is_dark {
+            ctx.set_visuals(if self.dark_mode {
+                egui::Visuals::dark()
+            } else {
+                egui::Visuals::light()
+            });
+        }
+
         if ctx.input(|i| {
             i.key_pressed(egui::Key::Escape) || i.pointer.button_clicked(egui::PointerButton::Extra1)
         }) {
@@ -795,8 +807,14 @@ impl eframe::App for MangaReaderApp {
             }
         });
 
+        let fill_color = if self.dark_mode {
+            egui::Color32::from_rgb(30, 30, 30)
+        } else {
+            egui::Color32::from_rgb(240, 240, 240)
+        };
+
         let frame = egui::Frame::central_panel(&ctx.style())
-            .fill(egui::Color32::from_rgb(240, 240, 240));
+            .fill(fill_color);
 
         egui::CentralPanel::default().frame(frame).show(ctx, |ui| {
             if self.images.is_empty() {
@@ -809,6 +827,11 @@ impl eframe::App for MangaReaderApp {
                     }
                     if ui.button("Open Archive (.zip, etc.)").clicked() {
                         self.open_archive_dialog(ctx);
+                    }
+                    ui.separator();
+                    let mode_text = if self.dark_mode { "🌙 Dark" } else { "☀ Light" };
+                    if ui.button(mode_text).clicked() {
+                        self.dark_mode = !self.dark_mode;
                     }
                 });
 
@@ -853,6 +876,12 @@ impl eframe::App for MangaReaderApp {
                     ui.selectable_value(&mut self.view_mode, ViewMode::SinglePage, "Single Page");
                     if prev_view_mode != self.view_mode && self.view_mode == ViewMode::Scroll {
                         self.scroll_to_page = Some(self.current_page);
+                    }
+                    ui.separator();
+
+                    let mode_text = if self.dark_mode { "🌙 Dark" } else { "☀ Light" };
+                    if ui.button(mode_text).clicked() {
+                        self.dark_mode = !self.dark_mode;
                     }
                     ui.separator();
 
@@ -1152,6 +1181,9 @@ fn main() -> eframe::Result<()> {
             if let Some(storage) = cc.storage {
                 if let Some(view_mode) = eframe::get_value(storage, "view_mode") {
                     app.view_mode = view_mode;
+                }
+                if let Some(dark_mode) = eframe::get_value(storage, "dark_mode") {
+                    app.dark_mode = dark_mode;
                 }
             }
             Ok(Box::new(app))
