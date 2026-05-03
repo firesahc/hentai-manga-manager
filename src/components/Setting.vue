@@ -500,7 +500,6 @@ import zhTw  from 'element-plus/dist/locale/zh-tw.mjs'
 import en from 'element-plus/dist/locale/en.mjs'
 
 import { version } from '../../package.json'
-import { gh_token } from '../../secret_key.json'
 import { acceleratorInfo } from '../utils.js'
 import NameFormItem from './NameFormItem.vue'
 
