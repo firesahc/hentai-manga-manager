@@ -52,7 +52,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Search32Filled } from '@vicons/fluent'
 import { Link } from '@element-plus/icons-vue'
-import he from 'he'
+import { createMetadataResolvers } from '../services/metadataResolvers.js'
 
 import { storeToRefs } from 'pinia'
 import { useAppStore } from '../pinia.js'
@@ -83,119 +83,35 @@ const openSearchDialog = (book, server) => {
   getBookListFromWeb(bookDetail.value.hash.toUpperCase(), searchStringDialog.value, searchTypeDialog.value, bookDetail.value.filepath)
 }
 
+const {
+  metadataResolverMap,
+  bookInfoResolverList,
+  searchResolverMap,
+  redirectUrlResolverMap
+} = createMetadataResolvers({
+  ipcRenderer,
+  cookie,
+  categoryOption,
+  tag2cat,
+  t,
+  printMessage,
+  saveBook,
+  serviceAvailable,
+  ehSearchResultList
+})
 
 
 const resolveSearchResult = (bookId, url, type) => {
   const book = _.find(bookList.value, {id: bookId})
-  if (type === 'hentag') {
-    book.url = url
-    getBookInfoFromHentag(book)
-  } else if (type === 'e-hentai') {
-    book.url = url
-    getBookInfoFromEh(book)
-  }
+  const metadataResolver = metadataResolverMap[type]
+  if (!metadataResolver) return
+  book.url = url
+  metadataResolver(book)
   dialogVisibleEhSearch.value = false
 }
-const getBookInfoFromHentag = async (book) => {
-  const data = await fetch(`https://hentag.com/public/api/vault/${book.url.slice(25)}`).then(res => res.json())
-  const tags = {}
-  data.language === 11 ? tags['language'] = ['chinese','translated'] : ''
-  data.parodies.length > 0 ? tags['parody'] = data.parodies.map(parody => parody.name) : ''
-  data.characters.length > 0 ? tags['character'] = data.characters.map(character => character.name) : ''
-  data.circles.length > 0 ? tags['group'] = data.circles.map(circle => circle.name) : ''
-  data.artists.length > 0 ? tags['artist'] = data.artists.map(artist => artist.name) : ''
-  data.maleTags.length > 0 ? tags['male'] = data.maleTags.map(maleTag => maleTag.name) : ''
-  data.femaleTags.length > 0 ? tags['female'] = data.femaleTags.map(femaleTag => femaleTag.name) : ''
-  if (data.otherTags.length > 0) {
-    data.otherTags.forEach(({ name }) => {
-      const cat = tag2cat.value[name]
-      if (cat) {
-        if (tags[cat]) {
-          tags[cat].push(name)
-        } else {
-          tags[cat] = [name]
-        }
-      } else {
-        if (tags['misc']) {
-          tags['misc'].push(name)
-        } else {
-          tags['misc'] = [name]
-        }
-      }
-    })
-  }
-  _.assign(book, {
-    title: data.title,
-    posted: Math.floor(data.createdAt / 1000),
-    category: categoryOption.value[data.category - 1],
-    tags
-  })
-  book.status = 'tagged'
-  await saveBook(book)
-}
-const getBookInfoFromEh = async (book) => {
-  const match = /(\d+)\/([a-z0-9]+)/.exec(book.url)
-  const res = await ipcRenderer.invoke('post-data-ex', {
-    url: 'https://api.e-hentai.org/api.php',
-    data: {
-      'method': 'gdata',
-      'gidlist': [
-          [+match[1], match[2]]
-      ],
-      'namespace': 1
-    }
-  })
-  try {
-    _.assign(
-      book,
-      _.pick(JSON.parse(res).gmetadata[0], ['tags', 'title', 'title_jpn', 'filecount', 'rating', 'posted', 'filesize', 'category']),
-    )
-    book.posted = +book.posted
-    book.filecount = +book.filecount
-    book.rating = +book.rating
-    book.title = he.decode(book.title)
-    book.title_jpn = he.decode(book.title_jpn)
-    const tagObject = _.groupBy(book.tags, tag => {
-      const result = /(.+):/.exec(tag)
-      if (result) {
-        return /(.+):/.exec(tag)[1]
-      } else {
-        return 'misc'
-      }
-    })
-    _.forIn(tagObject, (arr, key) => {
-      tagObject[key] = arr.map(tag => {
-        const result = /:(.+)$/.exec(tag)
-        if (result) {
-          return /:(.+)$/.exec(tag)[1]
-        } else {
-          return tag
-        }
-      })
-    })
-    book.tags = tagObject
-    book.status = 'tagged'
-    await saveBook(book)
-  } catch (e) {
-    console.log(e)
-    if (_.includes(res, 'Your IP address has been')) {
-      book.status = 'non-tag'
-      printMessage('error', t('c.ipBanned'))
-      await saveBook(book)
-      serviceAvailable.value = false
-    } else {
-      book.status = 'tag-failed'
-      printMessage('error', t('c.getMetadataFailed'))
-      await saveBook(book)
-    }
-  }
-}
 const getBookInfo = (book) => {
-  if (book.url.startsWith('https://hentag.com')) {
-    getBookInfoFromHentag(book)
-  } else if (book.url.includes('exhentai') || book.url.includes('e-hentai')) {
-    getBookInfoFromEh(book)
-  }
+  const resolver = _.find(bookInfoResolverList, ({ match }) => match(book.url))?.resolve
+  if (resolver) resolver(book)
 }
 const getBooksMetadata = async (bookList, gap, callback) => {
   const server = setting.value.defaultScraper || 'exhentai'
@@ -241,126 +157,19 @@ const getBooksMetadata = async (bookList, gap, callback) => {
 }
 
 const getBookListFromWeb = async (bookHash, title, server = 'e-hentai', bookPath = '') => {
-  let resultList = []
   searchResultLoading.value = true
-  if (server === 'e-hentai') {
-    resultList = await fetch(`https://e-hentai.org/?f_shash=${bookHash}&fs_similar=on&fs_exp=on&f_cats=161`)
-    .then(res => res.text())
-    .then(res => {
-      return resolveEhentaiResult(res)
-    })
-  } else if (server === 'exhentai') {
-    resultList = await ipcRenderer.invoke('get-ex-webpage', {
-      url: `https://exhentai.org/?f_shash=${bookHash}&fs_similar=on&fs_exp=on&f_cats=161`,
-      cookie: cookie.value
-    })
-    .then(res => {
-      return resolveEhentaiResult(res)
-    })
-  } else if (server === 'e-search') {
-    resultList = await fetch(`https://e-hentai.org/?f_search=${encodeURI(title)}&f_cats=161`)
-    .then(res => res.text())
-    .then(res => {
-      return resolveEhentaiResult(res)
-    })
-  } else if (server === 'exsearch') {
-    resultList = await ipcRenderer.invoke('get-ex-webpage', {
-      url: `https://exhentai.org/?f_search=${encodeURI(title)}&f_cats=161`,
-      cookie: cookie.value
-    })
-    .then(res => {
-      return resolveEhentaiResult(res)
-    })
-  } else if (server === 'hentag') {
-    resultList = await fetch(`https://hentag.com/public/api/vault-search?t=${encodeURI(title)}`)
-    .then(res => res.json())
-    .then(res => {
-      return resolveHentagResult(res)
-    })
-  } else if (server === '.ehviewer') {
-    const ehviewerData = await ipcRenderer.invoke('get-ehviewer-data', bookPath)
-
-    ehSearchResultList.value = []
-    if (ehviewerData) {
-      resultList = [{
-        title,
-        url: `https://exhentai.org/g/${ehviewerData.gid}/${ehviewerData.token}/`,
-        type: 'e-hentai'
-      }]
-      ehSearchResultList.value = resultList
-    }
-  }
+  const searchResolver = searchResolverMap[server]
+  const resultList = searchResolver ? await searchResolver({ bookHash, title, bookPath }) : []
   searchResultLoading.value = false
   return resultList
 }
 
 const redirectSearch = (bookHash, title, server = 'e-hentai') => {
-  let url
-  switch (server) {
-    case 'e-hentai':
-      url = `https://e-hentai.org/?f_shash=${bookHash}&fs_similar=on&fs_exp=on&f_cats=161`
-      break
-    case 'exhentai':
-      url = `https://exhentai.org/?f_shash=${bookHash}&fs_similar=on&fs_exp=on&f_cats=161`
-      break
-    case 'e-search':
-      url = `https://e-hentai.org/?f_search=${encodeURI(title)}&f_cats=161`
-      break
-    case '.ehviewer':
-    case 'exsearch':
-      url = `https://exhentai.org/?f_search=${encodeURI(title)}&f_cats=161`
-      break
-    case 'hentag':
-      url = `https://hentag.com/?t=${encodeURI(title)}`
-      break
-  }
+  const url = redirectUrlResolverMap[server]?.({ bookHash, title })
+  if (!url) return
   ipcRenderer.invoke('open-url', url)
 }
 
-const resolveEhentaiResult = (htmlString) => {
-  try {
-    const resultNodes = new DOMParser().parseFromString(htmlString, 'text/html').querySelectorAll('.gl3c.glname')
-    ehSearchResultList.value = []
-    resultNodes.forEach((node) => {
-      ehSearchResultList.value.push({
-        title: node.querySelector('.glink').innerHTML,
-        url: node.querySelector('a').getAttribute('href'),
-        type: 'e-hentai'
-      })
-    })
-    return ehSearchResultList.value
-  } catch (e) {
-    console.log(e)
-    if (htmlString.includes('Your IP address has been')) {
-      serviceAvailable.value = false
-      printMessage('error', t('c.ipBanned'))
-    } else {
-      printMessage('error', t('c.getMetadataFailed'))
-    }
-  }
-}
-
-const resolveHentagResult = (data) => {
-  const resultList = data.works.slice(0, 30)
-  ehSearchResultList.value = []
-  resultList.forEach((result) => {
-    const findExUrl = result.locations.find((location) => location.startsWith('https://exhentai.org'))
-    if (findExUrl) {
-      ehSearchResultList.value.push({
-        title: result.title,
-        url: findExUrl,
-        type: 'e-hentai'
-      })
-    } else {
-      ehSearchResultList.value.push({
-        title: result.title,
-        url: `https://hentag.com/vault/${result.id}`,
-        type: 'hentag'
-      })
-    }
-  })
-  return ehSearchResultList.value
-}
 
 defineExpose({
   dialogVisibleEhSearch,
